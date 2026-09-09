@@ -204,6 +204,24 @@
     background: rgba(122,46,34,0.26);
   }
 
+  table.score tbody td select{
+    width: 100%;
+    height: 40px;
+    border: none;
+    background: transparent;
+    text-align:center;
+    text-align-last: center;
+    font-size: 15px;
+    color: var(--ink);
+    font-family: inherit;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  table.score tbody td select:focus{
+    outline: none;
+    background: rgba(201,162,39,0.18);
+  }
+
   table.score tbody td input{
     width: 100%;
     height: 40px;
@@ -296,7 +314,7 @@
     </div>
     <h1>Póquer de Dados</h1>
     <p class="legend">A = Ases · R = Reis · D = Damas · V = Valetes · 10 = Dez · F = Fullen · S = Sequência · P = Póquer</p>
-    <p class="legend">Um resultado não pode ficar abaixo do número da coluna — entradas assim ficam a vermelho e valem 0 pontos no total.</p>
+    <p class="legend">Um resultado não pode ficar abaixo do número da coluna — entradas assim ficam a vermelho e valem 0 pontos no total. Excepções: Fullen e Póquer aceitam qualquer número; Sequência só permite 20, 30, 40, 60, 70, 80, 90, 120, 140, 160 ou 180.</p>
   </header>
 
   <div class="tabs">
@@ -368,9 +386,12 @@ function num(v){
   return isNaN(n) ? 0 : n;
 }
 
-// A result can't be lower than its column's number. An empty cell isn't
-// invalid — it just hasn't been played yet.
-function isInvalidCell(value, header){
+// A result can't be lower than its column's number — except Fullen (F) and
+// Póquer (P), which accept any number, and Sequência (S), which is
+// restricted to a fixed set of values instead (enforced via its dropdown,
+// not this check). An empty cell isn't invalid — it just hasn't been played yet.
+function isInvalidCell(value, header, rowKey){
+  if (rowKey === 'F' || rowKey === 'P' || rowKey === 'S') return false;
   if (value === '' || value === null || value === undefined) return false;
   const v = parseFloat(value);
   if (isNaN(v)) return false;
@@ -378,12 +399,13 @@ function isInvalidCell(value, header){
 }
 
 // Invalid entries score 0.
-function effectiveValue(value, header){
-  return isInvalidCell(value, header) ? 0 : num(value);
+function effectiveValue(value, header, rowKey){
+  return isInvalidCell(value, header, rowKey) ? 0 : num(value);
 }
 
 function rowRawSum(team, rowIndex){
-  return team.cells[rowIndex].reduce((sum, v, ci) => sum + effectiveValue(v, team.headers[ci]), 0);
+  const rowKey = ROWS[rowIndex].key;
+  return team.cells[rowIndex].reduce((sum, v, ci) => sum + effectiveValue(v, team.headers[ci], rowKey), 0);
 }
 
 function rawRowTotal(team, rowIndex){
@@ -401,7 +423,7 @@ function displayRowTotal(ti, rowIndex){
 }
 
 function columnTotal(team, colIndex){
-  return team.cells.reduce((sum, row, ri) => sum + effectiveValue(row[colIndex], team.headers[colIndex]), 0);
+  return team.cells.reduce((sum, row, ri) => sum + effectiveValue(row[colIndex], team.headers[colIndex], ROWS[ri].key), 0);
 }
 
 function grandTotal(ti){
@@ -436,10 +458,20 @@ function render(){
     ROWS.forEach((row, ri) => {
       const mult = MULTIPLIERS[row.key] !== undefined ? MULTIPLIERS[row.key] : 1;
       html += `<tr><th title="${row.label}">${row.key}<span class="mult">×${mult}</span></th>`;
-      team.cells[ri].forEach((val, ci) => {
-        const invalid = isInvalidCell(val, team.headers[ci]);
-        html += `<td><input type="number" inputmode="numeric" class="${invalid ? 'invalid' : ''}" value="${escapeAttr(val)}" oninput="setCell(${ti}, ${ri}, ${ci}, this)"></td>`;
-      });
+      if (row.key === 'S'){
+        const SEQ_VALUES = ['', '20', '30', '40', '60', '70', '80', '90', '120', '140', '160', '180'];
+        team.cells[ri].forEach((val, ci) => {
+          const opts = SEQ_VALUES.map(o =>
+            `<option value="${o}" ${String(val) === o ? 'selected' : ''}>${o === '' ? '—' : o}</option>`
+          ).join('');
+          html += `<td><select onchange="setCell(${ti}, ${ri}, ${ci}, this)">${opts}</select></td>`;
+        });
+      } else {
+        team.cells[ri].forEach((val, ci) => {
+          const invalid = isInvalidCell(val, team.headers[ci], row.key);
+          html += `<td><input type="number" inputmode="numeric" class="${invalid ? 'invalid' : ''}" value="${escapeAttr(val)}" oninput="setCell(${ti}, ${ri}, ${ci}, this)"></td>`;
+        });
+      }
       html += `<td class="row-total">${displayRowTotal(ti, ri)}</td>`;
       html += `</tr>`;
     });
@@ -495,8 +527,11 @@ function escapeAttr(s){ return escapeHtml(s); }
 function setCell(ti, ri, ci, inputEl){
   const value = inputEl.value;
   state.teams[ti].cells[ri][ci] = value;
-  const header = state.teams[ti].headers[ci];
-  inputEl.classList.toggle('invalid', isInvalidCell(value, header));
+  if (inputEl.tagName === 'INPUT'){
+    const header = state.teams[ti].headers[ci];
+    const rowKey = ROWS[ri].key;
+    inputEl.classList.toggle('invalid', isInvalidCell(value, header, rowKey));
+  }
   updateTotalsOnly();
   saveState();
 }
@@ -516,8 +551,10 @@ function refreshColumnValidity(ti, ci){
   const header = state.teams[ti].headers[ci];
   const rows = board.querySelectorAll('tbody tr');
   rows.forEach((tr, ri) => {
-    const input = tr.querySelectorAll('td input')[ci];
-    if (input) input.classList.toggle('invalid', isInvalidCell(state.teams[ti].cells[ri][ci], header));
+    const cell = tr.querySelectorAll('td')[ci];
+    if (!cell) return;
+    const input = cell.querySelector('input');
+    if (input) input.classList.toggle('invalid', isInvalidCell(state.teams[ti].cells[ri][ci], header, ROWS[ri].key));
   });
 }
 
