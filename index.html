@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Póquer de Dados — Marcador</title>
+<style>
+  :root{
+    --felt: #1f3d2b;
+    --felt-dark: #142819;
+    --felt-line: #2c5439;
+    --parchment: #ede2c6;
+    --parchment-dim: #e2d5b3;
+    --ink: #2b2118;
+    --ink-soft: #6b5c45;
+    --brass: #b08d57;
+    --brass-light: #d4b483;
+    --team1: #2e6b4f;
+    --team1-dark: #1e4a35;
+    --team2: #8c3b2e;
+    --team2-dark: #6b2b21;
+    --gold: #c9a227;
+    --danger: #7a2e22;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin:0; padding:0;
+    background: var(--felt-dark);
+    color: var(--ink);
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body{
+    min-height:100vh;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(255,255,255,0.03), transparent 40%),
+      linear-gradient(180deg, var(--felt) 0%, var(--felt-dark) 100%);
+    padding: 18px 14px 96px;
+  }
+
+  .wrap{ max-width: 920px; margin: 0 auto; }
+
+  header{
+    text-align:center;
+    color: var(--parchment);
+    margin-bottom: 18px;
+  }
+  header .dice-row{
+    display:flex; justify-content:center; gap:8px; margin-bottom: 8px;
+  }
+  header h1{
+    font-family: Rockwell, "Roboto Slab", Georgia, serif;
+    font-weight: 700;
+    font-size: clamp(24px, 6vw, 34px);
+    letter-spacing: 0.5px;
+    margin: 0 0 4px;
+    color: var(--parchment);
+  }
+  header p.legend{
+    margin: 6px auto 0;
+    max-width: 560px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--parchment-dim);
+    opacity: 0.85;
+  }
+
+  /* mobile tabs */
+  .tabs{
+    display:flex;
+    gap: 8px;
+    margin: 0 0 14px;
+  }
+  .tabs button{
+    flex:1;
+    padding: 10px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--brass);
+    background: transparent;
+    color: var(--parchment);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .tabs button.active.t1{ background: var(--team1); border-color: var(--team1); }
+  .tabs button.active.t2{ background: var(--team2); border-color: var(--team2); }
+
+  .boards{
+    display:grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  @media (min-width: 760px){
+    .boards{ grid-template-columns: 1fr 1fr; }
+    .tabs{ display:none; }
+  }
+
+  .board{
+    background: var(--parchment);
+    border-radius: 14px;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.35);
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+  .board[data-hidden="true"]{ display:none; }
+  @media (min-width: 760px){
+    .board[data-hidden="true"]{ display:block; }
+  }
+
+  .board-head{
+    padding: 12px 14px;
+    display:flex;
+    align-items:center;
+    gap: 10px;
+  }
+  .board-head.t1{ background: var(--team1); }
+  .board-head.t2{ background: var(--team2); }
+
+  .board-head input.team-name{
+    flex:1;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 8px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 16px;
+    padding: 7px 10px;
+    font-family: Rockwell, "Roboto Slab", Georgia, serif;
+  }
+  .board-head input.team-name::placeholder{ color: rgba(255,255,255,0.7); }
+
+  .board-head .badge{
+    font-family: Rockwell, "Roboto Slab", Georgia, serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    min-width: 46px;
+    text-align:right;
+  }
+
+  .table-scroll{ overflow-x: auto; }
+
+  table.score{
+    width: 100%;
+    border-collapse: collapse;
+  }
+  table.score th, table.score td{
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    border-right: 1px solid rgba(0,0,0,0.06);
+    padding: 0;
+    text-align:center;
+  }
+  table.score th:last-child, table.score td:last-child{ border-right:none; }
+
+  table.score thead th{
+    padding: 8px 4px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    background: var(--parchment-dim);
+  }
+  table.score thead th input{
+    width: 100%;
+    text-align:center;
+    border: none;
+    background: transparent;
+    font-weight: 700;
+    color: var(--ink);
+    font-size: 13px;
+    padding: 2px 0;
+  }
+  table.score thead th.total-h,
+  table.score tbody td.row-total,
+  table.score tfoot td.grand{
+    background: rgba(176,141,87,0.18);
+    font-weight: 700;
+  }
+
+  table.score tbody th{
+    width: 46px;
+    background: var(--parchment-dim);
+    font-family: Rockwell, "Roboto Slab", Georgia, serif;
+    font-size: 15px;
+    color: var(--ink);
+  }
+  table.score tbody th .mult{
+    display:block;
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--ink-soft);
+    margin-top: 1px;
+  }
+
+  table.score tbody td input.invalid{
+    background: rgba(122,46,34,0.16);
+    color: var(--danger);
+    font-weight: 700;
+  }
+  table.score tbody td input.invalid:focus{
+    background: rgba(122,46,34,0.26);
+  }
+
+  table.score tbody td input{
+    width: 100%;
+    height: 40px;
+    border: none;
+    background: transparent;
+    text-align:center;
+    font-size: 15px;
+    color: var(--ink);
+    font-family: inherit;
+  }
+  table.score tbody td input:focus{
+    outline: none;
+    background: rgba(201,162,39,0.18);
+  }
+  table.score tbody td.row-total{
+    font-family: Rockwell, "Roboto Slab", Georgia, serif;
+    font-size: 15px;
+  }
+
+  table.score tfoot td, table.score tfoot th{
+    padding: 9px 4px;
+    font-family: Rockwell, "Roboto Slab", Georgia, serif;
+    font-size: 14px;
+    background: var(--parchment-dim);
+  }
+  table.score tfoot td.grand{ font-size: 17px; }
+  table.score tfoot td.grand.leader{
+    background: #2f7d4f;
+    color: #fff;
+  }
+  table.score tfoot td.grand.trailer{
+    background: var(--danger);
+    color: #fbe4df;
+  }
+
+  .board-foot{
+    padding: 8px 14px 12px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    text-align:center;
+  }
+
+  .statusbar{
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: var(--felt-dark);
+    border-top: 1px solid var(--felt-line);
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    display:flex;
+    align-items:center;
+    gap: 12px;
+    color: var(--parchment);
+  }
+  .statusbar .scores{
+    flex:1;
+    display:flex;
+    gap: 14px;
+    align-items:baseline;
+    font-family: Rockwell, "Roboto Slab", Georgia, serif;
+    font-size: 14px;
+    flex-wrap: wrap;
+  }
+  .statusbar .scores b{ font-size: 18px; }
+  .statusbar .lead{ color: var(--gold); font-weight: 700; }
+  .statusbar button{
+    border: 1px solid var(--brass);
+    background: transparent;
+    color: var(--parchment);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .statusbar button:active{ background: rgba(255,255,255,0.08); }
+
+  .save-note{
+    text-align:center;
+    color: var(--parchment-dim);
+    font-size: 11px;
+    opacity: 0.7;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="dice-row" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" rx="5" fill="#ede2c6" stroke="#b08d57" stroke-width="1.5"/><circle cx="7" cy="7" r="1.8" fill="#2b2118"/><circle cx="17" cy="7" r="1.8" fill="#2b2118"/><circle cx="12" cy="12" r="1.8" fill="#2b2118"/><circle cx="7" cy="17" r="1.8" fill="#2b2118"/><circle cx="17" cy="17" r="1.8" fill="#2b2118"/></svg>
+    </div>
+    <h1>Póquer de Dados</h1>
+    <p class="legend">A = Ases · R = Reis · D = Damas · V = Valetes · 10 = Dez · F = Fullen · S = Sequência · P = Póquer</p>
+    <p class="legend">Um resultado não pode ficar abaixo do número da coluna — entradas assim ficam a vermelho e valem 0 pontos no total.</p>
+  </header>
+
+  <div class="tabs">
+    <button class="active t1" data-team="0" onclick="showTeam(0)">Equipa 1</button>
+    <button class="t2" data-team="1" onclick="showTeam(1)">Equipa 2</button>
+  </div>
+
+  <div class="boards" id="boards"></div>
+
+  <p class="save-note" id="saveNote">As pontuações ficam guardadas neste dispositivo.</p>
+</div>
+
+<div class="statusbar">
+  <div class="scores" id="scoresBar"></div>
+  <button onclick="resetAll()">Reiniciar</button>
+</div>
+
+<script>
+const ROWS = [
+  {key:'A', label:'Ases'},
+  {key:'R', label:'Reis'},
+  {key:'D', label:'Damas'},
+  {key:'V', label:'Valetes'},
+  {key:'10', label:'Dez'},
+  {key:'F', label:'Fullen'},
+  {key:'S', label:'Sequência'},
+  {key:'P', label:'Póquer'},
+];
+const DEFAULT_HEADERS = ['7','6','6','8','8'];
+const MULTIPLIERS = { A:6, R:5, D:4, V:3, '10':2, F:15, S:1, P:100 };
+
+function blankTeam(name){
+  return {
+    name: name,
+    headers: DEFAULT_HEADERS.slice(),
+    cells: ROWS.map(()=> ['', '', '', '', ''])
+  };
+}
+
+let state = {
+  teams: [blankTeam('Equipa 1'), blankTeam('Equipa 2')]
+};
+let activeTeam = 0;
+
+const STORAGE_KEY = 'dice-poker-scoreboard';
+
+async function loadState(){
+  try{
+    if (typeof window.storage === 'undefined') return;
+    const result = await window.storage.get(STORAGE_KEY, false);
+    if (result && result.value){
+      const parsed = JSON.parse(result.value);
+      if (parsed && parsed.teams && parsed.teams.length === 2){
+        state = parsed;
+      }
+    }
+  }catch(e){ /* no saved state yet, or storage unavailable */ }
+}
+
+async function saveState(){
+  try{
+    if (typeof window.storage === 'undefined') return;
+    await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
+  }catch(e){ /* saving is best-effort */ }
+}
+
+function num(v){
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+// A result can't be lower than its column's number. An empty cell isn't
+// invalid — it just hasn't been played yet.
+function isInvalidCell(value, header){
+  if (value === '' || value === null || value === undefined) return false;
+  const v = parseFloat(value);
+  if (isNaN(v)) return false;
+  return v < num(header);
+}
+
+// Invalid entries score 0.
+function effectiveValue(value, header){
+  return isInvalidCell(value, header) ? 0 : num(value);
+}
+
+function rowRawSum(team, rowIndex){
+  return team.cells[rowIndex].reduce((sum, v, ci) => sum + effectiveValue(v, team.headers[ci]), 0);
+}
+
+function rawRowTotal(team, rowIndex){
+  const key = ROWS[rowIndex].key;
+  const mult = MULTIPLIERS[key] !== undefined ? MULTIPLIERS[key] : 1;
+  return rowRawSum(team, rowIndex) * mult;
+}
+
+// Head-to-head: for each row, only the team with the higher raw total scores
+// anything, and what they score is the margin over the other team.
+function displayRowTotal(ti, rowIndex){
+  const thisRaw = rawRowTotal(state.teams[ti], rowIndex);
+  const otherRaw = rawRowTotal(state.teams[ti === 0 ? 1 : 0], rowIndex);
+  return thisRaw > otherRaw ? (thisRaw - otherRaw) : 0;
+}
+
+function columnTotal(team, colIndex){
+  return team.cells.reduce((sum, row, ri) => sum + effectiveValue(row[colIndex], team.headers[colIndex]), 0);
+}
+
+function grandTotal(ti){
+  return ROWS.reduce((sum, row, ri) => sum + displayRowTotal(ti, ri), 0);
+}
+
+function render(){
+  const boards = document.getElementById('boards');
+  boards.innerHTML = '';
+
+  state.teams.forEach((team, ti) => {
+    const isHidden = (ti !== activeTeam);
+    const board = document.createElement('div');
+    board.className = 'board';
+    board.dataset.hidden = String(isHidden);
+
+    const headClass = ti === 0 ? 't1' : 't2';
+    let html = '';
+    html += `<div class="board-head ${headClass}">`;
+    html += `<input class="team-name" value="${escapeAttr(team.name)}" oninput="renameTeam(${ti}, this.value)" placeholder="Nome da equipa">`;
+    html += `<div class="badge">${grandTotal(ti)}</div>`;
+    html += `</div>`;
+
+    html += `<div class="table-scroll"><table class="score">`;
+    html += `<thead><tr><th></th>`;
+    team.headers.forEach((h, ci) => {
+      html += `<th><input value="${escapeAttr(h)}" oninput="setHeader(${ti}, ${ci}, this.value)"></th>`;
+    });
+    html += `<th class="total-h">Total</th></tr></thead>`;
+
+    html += `<tbody>`;
+    ROWS.forEach((row, ri) => {
+      const mult = MULTIPLIERS[row.key] !== undefined ? MULTIPLIERS[row.key] : 1;
+      html += `<tr><th title="${row.label}">${row.key}<span class="mult">×${mult}</span></th>`;
+      team.cells[ri].forEach((val, ci) => {
+        const invalid = isInvalidCell(val, team.headers[ci]);
+        html += `<td><input type="number" inputmode="numeric" class="${invalid ? 'invalid' : ''}" value="${escapeAttr(val)}" oninput="setCell(${ti}, ${ri}, ${ci}, this)"></td>`;
+      });
+      html += `<td class="row-total">${displayRowTotal(ti, ri)}</td>`;
+      html += `</tr>`;
+    });
+    html += `</tbody>`;
+
+    const thisTotal = grandTotal(ti);
+    const otherTotal = grandTotal(ti === 0 ? 1 : 0);
+    let grandClass = 'grand';
+    if (thisTotal > otherTotal) grandClass += ' leader';
+    else if (thisTotal < otherTotal) grandClass += ' trailer';
+    html += `<tfoot><tr><th colspan="${team.headers.length + 1}">Total</th>`;
+    html += `<td class="${grandClass}">${thisTotal}</td>`;
+    html += `</tr></tfoot>`;
+    html += `</table></div>`;
+
+    html += `<div class="board-foot">Toque num número de cabeçalho para o editar, se as jogadas variarem.</div>`;
+
+    board.innerHTML = html;
+    boards.appendChild(board);
+  });
+
+  renderStatusBar();
+}
+
+function renderStatusBar(){
+  const bar = document.getElementById('scoresBar');
+  const t1 = grandTotal(0);
+  const t2 = grandTotal(1);
+  const n1 = escapeHtml(state.teams[0].name || 'Equipa 1');
+  const n2 = escapeHtml(state.teams[1].name || 'Equipa 2');
+
+  let lead = '';
+  if (t1 !== t2){
+    lead = t1 > t2
+      ? `<span class="lead">${n1} lidera</span>`
+      : `<span class="lead">${n2} lidera</span>`;
+  } else {
+    lead = `<span>Empate</span>`;
+  }
+
+  bar.innerHTML = `
+    <span>${n1}: <b>${t1}</b></span>
+    <span>${n2}: <b>${t2}</b></span>
+    ${lead}
+  `;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+function setCell(ti, ri, ci, inputEl){
+  const value = inputEl.value;
+  state.teams[ti].cells[ri][ci] = value;
+  const header = state.teams[ti].headers[ci];
+  inputEl.classList.toggle('invalid', isInvalidCell(value, header));
+  updateTotalsOnly();
+  saveState();
+}
+
+function setHeader(ti, ci, value){
+  state.teams[ti].headers[ci] = value;
+  refreshColumnValidity(ti, ci);
+  updateTotalsOnly();
+  saveState();
+}
+
+// Re-check every cell in a column against its (possibly just-edited) header,
+// without rebuilding the inputs (keeps focus/caret intact).
+function refreshColumnValidity(ti, ci){
+  const board = document.getElementById('boards').children[ti];
+  if (!board) return;
+  const header = state.teams[ti].headers[ci];
+  const rows = board.querySelectorAll('tbody tr');
+  rows.forEach((tr, ri) => {
+    const input = tr.querySelectorAll('td input')[ci];
+    if (input) input.classList.toggle('invalid', isInvalidCell(state.teams[ti].cells[ri][ci], header));
+  });
+}
+
+function renameTeam(ti, value){
+  state.teams[ti].name = value;
+  renderStatusBar();
+  saveState();
+}
+
+function updateTotalsOnly(){
+  // Recompute just the numbers without rebuilding inputs (keeps focus/caret intact)
+  state.teams.forEach((team, ti) => {
+    const board = document.getElementById('boards').children[ti];
+    if (!board) return;
+    const rowTotals = board.querySelectorAll('tbody td.row-total');
+    ROWS.forEach((row, ri) => {
+      if (rowTotals[ri]) rowTotals[ri].textContent = displayRowTotal(ti, ri);
+    });
+  });
+  const totals = [grandTotal(0), grandTotal(1)];
+  state.teams.forEach((team, ti) => {
+    const board = document.getElementById('boards').children[ti];
+    if (!board) return;
+    const grandCell = board.querySelector('tfoot td.grand');
+    if (grandCell){
+      const thisTotal = totals[ti];
+      const otherTotal = totals[ti === 0 ? 1 : 0];
+      grandCell.classList.remove('leader', 'trailer');
+      if (thisTotal > otherTotal) grandCell.classList.add('leader');
+      else if (thisTotal < otherTotal) grandCell.classList.add('trailer');
+      grandCell.textContent = thisTotal;
+    }
+    const badge = board.querySelector('.badge');
+    if (badge) badge.textContent = totals[ti];
+  });
+  renderStatusBar();
+}
+
+function showTeam(ti){
+  activeTeam = ti;
+  document.querySelectorAll('.tabs button').forEach((btn, i) => {
+    btn.classList.toggle('active', i === ti);
+  });
+  render();
+}
+
+function resetAll(){
+  const ok = confirm('Reiniciar o marcador e limpar todas as pontuações?');
+  if (!ok) return;
+  const n1 = state.teams[0].name;
+  const n2 = state.teams[1].name;
+  state = { teams: [blankTeam(n1 || 'Equipa 1'), blankTeam(n2 || 'Equipa 2')] };
+  render();
+  saveState();
+}
+
+(async function init(){
+  await loadState();
+  render();
+})();
+</script>
+</body>
+</html>
